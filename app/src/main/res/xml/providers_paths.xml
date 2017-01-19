@@ -1,0 +1,5 @@
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--path：需要临时授权访问的路径，已sdcard的根目录为起点，.表示授权访问的路径为整个sdcard根目录）-->
+    <!--name：就是这个访问路径的别名，随便取-->
+    <external-path name="external_files" path="."/>
+</paths>
