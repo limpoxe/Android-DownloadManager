@@ -11,12 +11,15 @@ import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.limpoxe.downloads.DownloadManager;
@@ -35,45 +38,54 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
 
-    BroadcastReceiver receiver = new BroadcastReceiver() {
+    BroadcastReceiver downloadComplte = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            long downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
 
-            //下载完成后打开图片
-            Intent install = new Intent(Intent.ACTION_VIEW);
-            Uri downloadFileUri = dw.getUriForDownloadedFile(downloadId);
-            if (downloadFileUri != null) {
-                DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
-                Cursor c = null;
-                try {
-                    c = dw.query(query);
-                    if (c != null && c.moveToFirst()) {
-                        String localUri = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI));
-                        Log.d("MainActivity", downloadFileUri.toString());
-                        //7.0系统不能在intent中包含file:///协议
-                        File file = new File(localUri.replace("file://", ""));
-                        Intent openIntent = new Intent(Intent.ACTION_VIEW,
-                                FileProvider.getUriForFile(MainActivity.this,
-                                context.getApplicationContext().getPackageName() + ".provider", file));
-                        openIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        startActivity(openIntent);
+            Log.d("MainActivity", "downloadComplte");
+
+            long did = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+
+            //如果有多个任务在下载，只关心需要关心的任务
+            if (did == downloadId) {
+                //下载完成后打开图片
+                Intent install = new Intent(Intent.ACTION_VIEW);
+                Uri downloadFileUri = dw.getUriForDownloadedFile(downloadId);
+                if (downloadFileUri != null) {
+                    DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
+                    Cursor c = null;
+                    try {
+                        c = dw.query(query);
+                        if (c != null && c.moveToFirst()) {
+                            String localUri = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI));
+                            Log.d("MainActivity", downloadFileUri.toString());
+                            //7.0系统不能在intent中包含file:///协议
+                            File file = new File(localUri.replace("file://", ""));
+                            Intent openIntent = new Intent(Intent.ACTION_VIEW,
+                                    FileProvider.getUriForFile(MainActivity.this,
+                                            context.getApplicationContext().getPackageName() + ".provider", file));
+                            openIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            startActivity(openIntent);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        if (c != null) {
+                            c.close();
+                        }
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    if (c != null) {
-                        c.close();
-                    }
+                } else {
+                    Log.e("MainActivity", "download error");
                 }
-            } else {
-                Log.e("MainActivity", "download error");
             }
+
         }
     };
 
     long downloadId = 0;
     DownloadStatusObserver observer;
+
+    private boolean isDownloading = false;
 
     class DownloadStatusObserver extends ContentObserver {
         public DownloadStatusObserver() {
@@ -83,7 +95,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         public void onChange(boolean selfChange) {
 
-            Log.d("MainActivity", "onChange");
+            Log.w("MainActivity", "onChange " + downloadId);
 
             if (downloadId != 0) {
                 int[] bytesAndStatus = getBytesAndStatus(downloadId);
@@ -91,17 +103,41 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 int totalSize = bytesAndStatus[1];//总大小
                 int status = bytesAndStatus[2];//下载状态
 
-                Log.d("MainActivity", "downloadId = " +downloadId + ", currentSize/totalSize : " + currentSize + "/" + totalSize + ", status=" + status);
+                progressBar.setMax(totalSize);
+                progressBar.setProgress(currentSize);
+
+                if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                    isDownloading = false;
+                    Toast.makeText(MainActivity.this, "id=" + downloadId + "下载完成", Toast.LENGTH_SHORT).show();
+                }
+                textView.setText("id=" + downloadId + "下载进度：" + currentSize + "/" + totalSize);
             }
         }
 
     }
+
+    private ProgressBar progressBar;
+    private TextView textView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        checkPermiss();
+
+        handler = new Handler();
+        dw = new DownloadManager(this);
+
+        progressBar = (ProgressBar)findViewById(R.id.firstBar);
+        textView = (TextView) findViewById(R.id.text);
+
+        findViewById(R.id.download).setOnClickListener(this);
+
+        registerReceiver(downloadComplte, filter);
+    }
+
+    private void checkPermiss() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             int permissionState = checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE);
             if (permissionState != PackageManager.PERMISSION_GRANTED) {
@@ -112,13 +148,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             }
         }
-
-        handler = new Handler();
-        dw = new DownloadManager(this);
-
-        findViewById(R.id.download).setOnClickListener(this);
-
-        registerReceiver(receiver, filter);
     }
 
     @Override
@@ -139,6 +168,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         if (v.getId() == R.id.download) {
 
+            checkPermiss();
+
+            if (isDownloading) {
+                Toast.makeText(MainActivity.this, "心急吃不了豆腐", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse("http://download.taobaocdn.com/wireless/taobao4android/latest/701483.apk"));
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE);
             request.setTitle("下载jpg");
@@ -146,18 +182,25 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             request.setMimeType("image/jpeg");
 
             //实际下载后存放的路径并不一定是这个名字，如果有重名的，自动向名字中追加数字编号
-            File file = new File("/sdcard/xx.jpg");
-            request.setDestinationUri(Uri.fromFile(file));
+            File apkFile = new File(Environment.getExternalStorageDirectory(), Environment.DIRECTORY_DOWNLOADS + "/701483.apk");
+            request.setDestinationUri(Uri.fromFile(apkFile));
 
             downloadId = dw.enqueue(request);
+            isDownloading = true;
 
-            Uri uri = dw.getUriForDownloadedFile(downloadId);
+            Uri uri = dw.getDownloadUri(downloadId);
 
             if (uri != null) {
+                progressBar.setMax(1000);
+                progressBar.setProgress(0);
+
+                if (observer != null) {
+                    getContentResolver().unregisterContentObserver(observer);
+                    observer = null;
+                }
                 observer = new DownloadStatusObserver();
                 getContentResolver().registerContentObserver(uri, true, observer);
             }
-
         }
 
     }
@@ -170,14 +213,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(receiver);
+        unregisterReceiver(downloadComplte);
         if (observer != null) {
             getContentResolver().unregisterContentObserver(observer);
+            observer = null;
         }
 
     }
 
-    public int[] getBytesAndStatus(long downloadId) {
+    private int[] getBytesAndStatus(long downloadId) {
         int[] bytesAndStatus = new int[] { -1, -1, 0 };
         DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
         Cursor c = null;
