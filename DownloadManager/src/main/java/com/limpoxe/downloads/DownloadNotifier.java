@@ -31,28 +31,28 @@ public class DownloadNotifier {
     }
 
     public void cancelAll() {
-        Log.w("DownloadNotifier", "cancelAll Notification");
+        Log.v("DownloadNotifier", "cancelAll Notification");
     }
 
     public void notifyDownloadSpeed(long id, long bytesPerSecond) {
         synchronized (mLock1) {
             if (bytesPerSecond != 0) {
-                Log.d("DownloadNotifier", "notifyDownloadSpeed " + id + " " + bytesPerSecond);
+                Log.v("DownloadNotifier", "notifyDownloadSpeed " + id + " " + bytesPerSecond);
             } else {
-                Log.w("DownloadNotifier", "notifyDownloadSpeed " + id + " " + bytesPerSecond);
+                Log.v("DownloadNotifier", "notifyDownloadSpeed " + id + " " + bytesPerSecond);
             }
         }
     }
 
     public void updateWith(Collection<DownloadInfo> downloads) {
         synchronized (mLock2) {
-            Log.d("DownloadNotifier", "updateWith ");
+            Log.v("DownloadNotifier", "updateWith ");
         }
     }
 
     public void dumpSpeeds() {
         synchronized (mLock3) {
-            Log.d("DownloadNotifier", "dumpSpeed");
+            Log.v("DownloadNotifier", "dumpSpeed");
         }
     }
 
