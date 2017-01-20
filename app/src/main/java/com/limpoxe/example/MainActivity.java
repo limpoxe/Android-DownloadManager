@@ -1,7 +1,6 @@
 package com.limpoxe.example;
 
 import android.Manifest;
-import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -23,7 +22,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.limpoxe.downloads.DownloadManager;
-import com.limpoxe.downloads.Downloads;
 
 import java.io.File;
 
@@ -127,12 +125,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         checkPermiss();
 
         handler = new Handler();
-        dw = new DownloadManager(this);
+        dw = DownloadManager.getInstance(this);
 
         progressBar = (ProgressBar)findViewById(R.id.firstBar);
         textView = (TextView) findViewById(R.id.text);
 
         findViewById(R.id.download).setOnClickListener(this);
+        findViewById(R.id.pause).setOnClickListener(this);
+        findViewById(R.id.resume).setOnClickListener(this);
 
         registerReceiver(downloadComplte, filter);
     }
@@ -201,6 +201,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 observer = new DownloadStatusObserver();
                 getContentResolver().registerContentObserver(uri, true, observer);
             }
+        } else if (v.getId() == R.id.pause) {
+            dw.pauseDownload(downloadId);
+        } else if (v.getId() == R.id.resume) {
+            dw.resumeDownload(downloadId);
         }
 
     }
@@ -238,24 +242,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
         return bytesAndStatus;
-    }
-
-    private void openDownload(Context context, Cursor cursor) {
-        String filename = cursor.getString(cursor.getColumnIndexOrThrow(Downloads.Impl._DATA));
-        String mimetype = cursor.getString(cursor.getColumnIndexOrThrow(Downloads.Impl.COLUMN_MIME_TYPE));
-        Uri path = Uri.parse(filename);
-        // If there is no scheme, then it must be a file
-        if (path.getScheme() == null) {
-            path = Uri.fromFile(new File(filename));
-        }
-        Intent activityIntent = new Intent(Intent.ACTION_VIEW);
-        activityIntent.setDataAndType(path, mimetype);
-        activityIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try {
-            context.startActivity(activityIntent);
-        } catch (ActivityNotFoundException ex) {
-            Log.d("MainActivity", "no activity for " + mimetype, ex);
-        }
     }
 
 }
