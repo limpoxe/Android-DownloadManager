@@ -63,7 +63,7 @@ public class StorageUtils {
     public static void ensureAvailableSpace(Context context, FileDescriptor fd)
             throws IOException, StopRequestException {
         //TODO
-        Log.v("StorageUtil", "should check space here");
+        Log.w("StorageUtil", "todo should check space here");
     }
 
     /**

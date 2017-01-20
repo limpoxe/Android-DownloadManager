@@ -533,7 +533,7 @@ public final class DownloadProvider extends ContentProvider {
                         android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
                         "No permission to write");
 
-                if (!PermissionChecker.writeExternalStoragePermission()) {
+                if (!PermissionChecker.writeExternalStoragePermission(getContext())) {
                     throw new SecurityException("No permission to write");
                 }
 
@@ -674,7 +674,7 @@ public final class DownloadProvider extends ContentProvider {
         }
 
         final File file = new File(path);
-        if (!PermissionChecker.writeExternalStoragePermission()) {
+        if (!PermissionChecker.writeExternalStoragePermission(getContext())) {
             throw new SecurityException("Unsupported path " + file);
         }
     }
@@ -1000,6 +1000,7 @@ public final class DownloadProvider extends ContentProvider {
                 startService = true;
             }
 
+            copyInteger(Downloads.Impl.COLUMN_STATUS, values, filteredValues);
             copyInteger(Downloads.Impl.COLUMN_CONTROL, values, filteredValues);
             copyString(Downloads.Impl.COLUMN_TITLE, values, filteredValues);
             copyString(Downloads.Impl.COLUMN_MEDIAPROVIDER_URI, values, filteredValues);
@@ -1185,7 +1186,17 @@ public final class DownloadProvider extends ContentProvider {
 
         final File file = new File(path);
 
-        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_WRITE);
+        int fileMode = 0;
+        if (mode.contains("w")) {
+            fileMode |= ParcelFileDescriptor.MODE_WRITE_ONLY;
+        }
+        if (mode.contains("r")) {
+            fileMode |= ParcelFileDescriptor.MODE_READ_ONLY;
+        }
+        if (mode.contains("+")) {
+            fileMode |= ParcelFileDescriptor.MODE_APPEND;
+        }
+        return ParcelFileDescriptor.open(file, fileMode);
     }
 
     @Override

@@ -862,6 +862,8 @@ public class DownloadManager {
         }
     }
 
+    private static DownloadManager sInstance;
+
     private final Context mApplicationContext;
     private final ContentResolver mResolver;
     private final String mPackageName;
@@ -872,7 +874,7 @@ public class DownloadManager {
     /**
      * @hide
      */
-    public DownloadManager(Context context) {
+    private DownloadManager(Context context) {
         mApplicationContext = context;
         mResolver = context.getContentResolver();
         mPackageName = context.getPackageName();
@@ -880,6 +882,17 @@ public class DownloadManager {
         // Callers can access filename columns when targeting old platform
         // versions; otherwise we throw telling them it's deprecated.
         mAccessFilename = context.getApplicationInfo().targetSdkVersion < Build.VERSION_CODES.N;
+    }
+
+    public static DownloadManager getInstance(Context context) {
+        if(sInstance == null){
+            synchronized(DownloadManager.class){
+                if(sInstance == null){
+                    sInstance = new DownloadManager(context);
+                }
+            }
+        }
+        return sInstance;
     }
 
     /**
@@ -1063,6 +1076,20 @@ public class DownloadManager {
         values.put(Downloads.Impl.COLUMN_CONTROL, Downloads.Impl.CONTROL_RUN);
         values.put(Downloads.Impl.COLUMN_BYPASS_RECOMMENDED_SIZE_LIMIT, 1);
         mResolver.update(mBaseUri, values, getWhereClauseForIds(ids), getWhereArgsForIds(ids));
+    }
+
+    public int pauseDownload(long... ids) {
+        ContentValues values = new ContentValues();
+        values.put(Downloads.Impl.COLUMN_STATUS, Downloads.Impl.STATUS_PAUSED_BY_APP);
+        values.put(Downloads.Impl.COLUMN_CONTROL, Downloads.Impl.CONTROL_PAUSED);
+        return mResolver.update(mBaseUri, values, getWhereClauseForIds(ids), getWhereArgsForIds(ids));
+    }
+
+    public int resumeDownload(long... ids) {
+        ContentValues values = new ContentValues();
+        values.put(Downloads.Impl.COLUMN_STATUS, Downloads.Impl.STATUS_PENDING);
+        values.put(Downloads.Impl.COLUMN_CONTROL, Downloads.Impl.CONTROL_RUN);
+        return mResolver.update(mBaseUri, values, getWhereClauseForIds(ids), getWhereArgsForIds(ids));
     }
 
     /**

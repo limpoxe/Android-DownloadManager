@@ -19,6 +19,7 @@ package com.limpoxe.downloads;
 import android.content.ContentValues;
 import android.content.Context;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
@@ -316,6 +317,8 @@ public class DownloadThread implements Runnable {
     private void executeDownload() throws StopRequestException {
         final boolean resuming = mInfoDelta.mCurrentBytes != 0;
 
+        logDebug("resuming; mCurrentBytes is " + mInfoDelta.mCurrentBytes);
+
         URL url;
         try {
             // TODO: migrate URL sanity checking into client side of API
@@ -355,6 +358,9 @@ public class DownloadThread implements Runnable {
                             throw new StopRequestException(
                                     STATUS_CANNOT_RESUME, "Expected OK, but received partial");
                         }
+
+                        logDebug("resuming; received partial ");
+
                         transferData(conn);
                         return;
 
@@ -440,8 +446,12 @@ public class DownloadThread implements Runnable {
             }
 
             try {
+                Uri uri = mInfo.getAllDownloadsUri();
+
+                logDebug("openFileDescriptor " + uri.toString());
+
                 outPfd = mContext.getContentResolver()
-                        .openFileDescriptor(mInfo.getAllDownloadsUri(), "rw");
+                        .openFileDescriptor(uri, "rw+");
                 outFd = outPfd.getFileDescriptor();
                 out = new ParcelFileDescriptor.AutoCloseOutputStream(outPfd);
             } catch (Exception e) {
@@ -491,7 +501,12 @@ public class DownloadThread implements Runnable {
             try {
                 // When streaming, ensure space before each write
                 if (mInfoDelta.mTotalBytes == -1) {
-                    StorageUtils.ensureAvailableSpace(mContext, outFd);
+
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                        final long curSize = Os.fstat(outFd).st_size;
+                        final long newBytes = (mInfoDelta.mCurrentBytes + len) - curSize;
+                    }
+                    StorageUtils.ensureAvailableSpace(mContext, outFd/*,newBytes*/);
                 }
 
                 out.write(buffer, 0, len);
